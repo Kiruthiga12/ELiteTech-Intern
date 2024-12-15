@@ -1,0 +1,106 @@
+# Importing Libraries
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# 1. Load Data
+data = pd.read_csv('https://raw.githubusercontent.com/krishnaik06/Car-Price-Prediction/master/car%20data.csv')  # Replace with your actual dataset path
+
+# 2. Feature Engineering
+data['Car_Age'] = 2024 - data['Year']  # Calculate Car Age
+data.drop(['Year'], axis=1, inplace=True)  # Drop original 'Year' column
+
+# 3. Define Features and Target
+X = data.drop(['Selling_Price', 'Car_Name'], axis=1, errors='ignore')
+y = data['Selling_Price']
+
+# Check for null values
+if X.isnull().sum().any() or y.isnull().sum().any():
+    print("Handling missing values...")
+    X.fillna(X.mean(), inplace=True)  # Replace missing numerical values with the mean
+    y.fillna(y.mean(), inplace=True)
+
+# 4. Preprocess Categorical and Numerical Features
+numerical_features = X.select_dtypes(include=['int64', 'float64']).columns
+categorical_features = X.select_dtypes(include=['object']).columns
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', StandardScaler(), numerical_features),
+        ('cat', OneHotEncoder(drop='first'), categorical_features)
+    ]
+)
+
+# 5. Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 6. Scale and Encode Data
+X_train = preprocessor.fit_transform(X_train)
+X_test = preprocessor.transform(X_test)
+
+# 7. Model Building with Hyperparameter Tuning
+rf_model = RandomForestRegressor(random_state=42)
+
+# Hyperparameter grid for tuning
+param_grid = {
+    'n_estimators': [100, 200, 300],
+    'max_depth': [None, 10, 20],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4]
+}
+
+# Grid Search for best parameters
+grid_search = GridSearchCV(estimator=rf_model, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
+grid_search.fit(X_train, y_train)
+
+best_model = grid_search.best_estimator_
+print("Best Parameters Found:", grid_search.best_params_)
+
+# 8. Model Evaluation
+y_pred = best_model.predict(X_test)
+
+# Evaluation Metrics
+print("R2 Score:", r2_score(y_test, y_pred))
+print("Mean Absolute Error (MAE):", mean_absolute_error(y_test, y_pred))
+print("Root Mean Squared Error (RMSE):", np.sqrt(mean_squared_error(y_test, y_pred)))
+
+# 9. Plot Actual vs Predicted
+plt.figure(figsize=(8, 6))
+sns.scatterplot(x=y_test, y=y_pred, color="blue", alpha=0.6)
+plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], color='red', linestyle='--')
+plt.title("Actual vs Predicted Selling Price")
+plt.xlabel("Actual Selling Price")
+plt.ylabel("Predicted Selling Price")
+plt.show()
+
+# 10. Custom Input Prediction
+def predict_car_price(custom_input):
+    """
+    Predicts car price for custom inputs.
+    custom_input: Dictionary with keys matching feature names.
+    """
+    # Convert to DataFrame
+    input_df = pd.DataFrame([custom_input])
+    input_transformed = preprocessor.transform(input_df)
+    prediction = best_model.predict(input_transformed)
+    return prediction[0]
+
+# Example Custom Input
+custom_car = {
+    'Present_Price': 5.59,
+    'Kms_Driven': 27000,
+    'Fuel_Type': 'Petrol',
+    'Seller_Type': 'Dealer',
+    'Transmission': 'Manual',
+    'Owner': 0,
+    'Car_Age': 4
+}
+
+predicted_price = predict_car_price(custom_car)
+print("Predicted Selling Price for Custom Car Input:", round(predicted_price, 2))
