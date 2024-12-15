@@ -1,0 +1,48 @@
+# Importing libraries
+import pandas as pd
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, classification_report
+
+# Load dataset
+url = "https://raw.githubusercontent.com/justmarkham/DAT8/master/data/sms.tsv"
+data = pd.read_csv(url, sep='\t', names=['label', 'message'])
+
+# Display the first few rows
+print("Dataset Sample:")
+print(data.head())
+
+# Preprocessing: Convert labels to binary (0 for 'ham', 1 for 'spam')
+data['label'] = data['label'].map({'ham': 0, 'spam': 1})
+
+# Text Processing: Convert messages to feature vectors using CountVectorizer
+vectorizer = CountVectorizer()
+X = vectorizer.fit_transform(data['message'])
+
+# Target variable
+y = data['label']
+
+# Split the data into train and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train the model using Multinomial Naive Bayes
+model = MultinomialNB()
+model.fit(X_train, y_train)
+
+# Predictions
+y_pred = model.predict(X_test)
+
+# Accuracy
+print("\nModel Accuracy:", accuracy_score(y_test, y_pred))
+
+# Classification Report
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+# Test with a custom message
+custom_message = ["Congratulations, you won a lottery! Click here to claim."]
+custom_vector = vectorizer.transform(custom_message)
+prediction = model.predict(custom_vector)
+
+print("\nCustom Message Prediction:", "Spam" if prediction[0] else "Ham")
